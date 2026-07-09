@@ -1,0 +1,4 @@
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/nav_banner_bg_offroute" />
+    <padding android:left="16dp" android:top="12dp" android:right="16dp" android:bottom="12dp" />
+</shape>

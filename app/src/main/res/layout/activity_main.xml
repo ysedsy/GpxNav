@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <org.osmdroid.views.MapView
+        android:id="@+id/map"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Turn-by-turn banner, big and high-contrast for glanceability while riding -->
+    <LinearLayout
+        android:id="@+id/navBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/banner_bg"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/ivArrow"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:src="@drawable/ic_arrow_straight"
+            android:contentDescription="@null" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvInstruction"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/nav_text"
+                android:textSize="34sp"
+                android:textStyle="bold"
+                android:maxLines="2"
+                android:text="Load a GPX route" />
+
+            <TextView
+                android:id="@+id/tvDistance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/nav_text_muted"
+                android:textSize="20sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:orientation="vertical">
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/btnFollow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:src="@android:drawable/ic_menu_mylocation"
+            android:contentDescription="@null" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/btnLoadGpx"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@android:drawable/ic_menu_upload"
+            android:contentDescription="@null" />
+    </LinearLayout>
+
+</FrameLayout>
