@@ -199,7 +199,9 @@ class NavigationService : Service() {
             rerouteRoadPoints = null
         }
 
-        val arrived = update.isFinalLeg && update.distanceToEvent < ARRIVED_THRESHOLD_METERS
+        val arrived = update.isFinalLeg &&
+            update.distanceToEvent < ARRIVED_THRESHOLD_METERS &&
+            update.distanceToDestinationMeters < ARRIVED_THRESHOLD_METERS
         lastLocation = location
         lastUpdate = update
         hasArrived = arrived

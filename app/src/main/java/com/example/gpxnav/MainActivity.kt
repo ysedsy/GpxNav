@@ -7,6 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.DashPathEffect
 import android.location.Location
 import android.net.Uri
@@ -106,6 +108,7 @@ class MainActivity : AppCompatActivity() {
 
         b.map.setTileSource(TileSourceFactory.MAPNIK)
         b.map.setMultiTouchControls(true)
+        applyMapNightFilter()
         b.map.controller.setZoom(6.0)
         b.map.controller.setCenter(GeoPoint(51.16, 10.45)) // roughly the center of Germany
 
@@ -216,6 +219,36 @@ class MainActivity : AppCompatActivity() {
             b.map.overlays.add(overlay)
             myLocationOverlay = overlay
         }
+    }
+
+    /** Follows the system day/night setting for the map tiles themselves - osmdroid always renders the
+     *  (light) OSM tile set, so dark mode needs a color filter rather than a different tile source. Called
+     *  from onCreate; a system theme change recreates the Activity (default DayNight behavior, same as a
+     *  rotation), and this re-picks the right filter on the way back up while NavigationService keeps
+     *  running underneath, so navigation state isn't lost. */
+    private fun applyMapNightFilter() {
+        val isNight = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        b.map.overlayManager.tilesOverlay.setColorFilter(if (isNight) darkTileColorFilter() else null)
+        b.map.invalidate()
+    }
+
+    /** Standard osmdroid dark-tile trick: invert the tile colors, then rotate hue back on the blue axis -
+     *  a plain invert alone turns the light OSM basemap into a jarring orange/purple; this pulls it back
+     *  to the recognizable dark-navy look. Verified on-device; rotating all three color axes instead
+     *  (the "more correct" reading of this technique) looks worse, not better. */
+    private fun darkTileColorFilter(): ColorMatrixColorFilter {
+        val negative = ColorMatrix(
+            floatArrayOf(
+                -1f, 0f, 0f, 0f, 255f,
+                0f, -1f, 0f, 0f, 255f,
+                0f, 0f, -1f, 0f, 255f,
+                0f, 0f, 0f, 1f, 0f
+            )
+        )
+        val hueRotate = ColorMatrix().apply { setRotate(2, 180f) }
+        negative.postConcat(hueRotate)
+        return ColorMatrixColorFilter(negative)
     }
 
     /** Reloads whichever GPX was persisted at last shutdown - a copy in app-internal storage, not a

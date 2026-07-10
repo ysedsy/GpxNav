@@ -206,6 +206,7 @@ data class NavUpdate(
     val maneuverType: ManeuverType,
     val turnAngleDegrees: Double,
     val distanceToEvent: Double,
+    val distanceToDestinationMeters: Double,
     val isFinalLeg: Boolean,
     val segmentIndex: Int,
     val maneuverIndex: Int
@@ -248,6 +249,8 @@ class NavigationSession(val route: Route, initialDistanceAlongRoute: Double = 0.
         val loc = locator.locate(lat, lon)
         offRoute = if (offRoute) loc.offRouteMeters > OFF_ROUTE_EXIT_METERS else loc.offRouteMeters > OFF_ROUTE_ENTER_METERS
         skipManeuversBefore(loc.distanceAlongRoute - HYSTERESIS_METERS)
+        val destination = route.points.last()
+        val distanceToDestination = GeoMath.haversineMeters(lat, lon, destination.lat, destination.lon)
         val next = route.maneuvers.getOrNull(maneuverPointer)
         return if (next != null) {
             NavUpdate(
@@ -259,6 +262,7 @@ class NavigationSession(val route: Route, initialDistanceAlongRoute: Double = 0.
                 maneuverType = next.type,
                 turnAngleDegrees = next.turnAngleDegrees,
                 distanceToEvent = (next.distanceAlongRoute - loc.distanceAlongRoute).coerceAtLeast(0.0),
+                distanceToDestinationMeters = distanceToDestination,
                 isFinalLeg = false,
                 segmentIndex = loc.segmentIndex,
                 maneuverIndex = maneuverPointer
@@ -273,6 +277,7 @@ class NavigationSession(val route: Route, initialDistanceAlongRoute: Double = 0.
                 maneuverType = ManeuverType.STRAIGHT,
                 turnAngleDegrees = 0.0,
                 distanceToEvent = (route.totalDistance - loc.distanceAlongRoute).coerceAtLeast(0.0),
+                distanceToDestinationMeters = distanceToDestination,
                 isFinalLeg = true,
                 segmentIndex = loc.segmentIndex,
                 maneuverIndex = maneuverPointer

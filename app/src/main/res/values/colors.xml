@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="nav_banner_bg">#1A1D27</color>
-    <color name="nav_banner_bg_offroute">#7A1F1F</color>
-    <color name="nav_banner_bg_gpslost">#5A4A1F</color>
-    <color name="nav_accent">#4F8EF7</color>
-    <color name="nav_text">#FFFFFF</color>
-    <color name="nav_text_muted">#B0B4C8</color>
-    <color name="route_traveled">#5A5F73</color>
-    <color name="reroute_path">#F2A93B</color>
-    <color name="lane_active">#4F8EF7</color>
-    <color name="lane_inactive">#4A4E5E</color>
+    <color name="nav_banner_bg">#F4F5F9</color>
+    <color name="nav_banner_bg_offroute">#F8D7D7</color>
+    <color name="nav_banner_bg_gpslost">#F5E6C0</color>
+    <color name="nav_accent">#3568D4</color>
+    <color name="nav_text">#1A1D27</color>
+    <color name="nav_text_muted">#5A5F73</color>
+    <color name="route_traveled">#8A8FA3</color>
+    <color name="reroute_path">#D98A1F</color>
+    <color name="lane_active">#3568D4</color>
+    <color name="lane_inactive">#C9CCDA</color>
 </resources>
