@@ -1,6 +1,7 @@
 package com.example.gpxnav
 
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 enum class ManeuverType { STRAIGHT, SLIGHT_LEFT, LEFT, SHARP_LEFT, SLIGHT_RIGHT, RIGHT, SHARP_RIGHT, U_TURN }
 
@@ -57,9 +58,9 @@ class Route(val points: List<RoutePoint>) {
         return result
     }
 
-    /** Interpolated point at a given cumulative distance along the route; used to generate candidate
-     *  rejoin points when off-route without needing a raw point index. */
-    fun pointAtDistance(distance: Double): RoutePoint {
+    /** Index idx such that cumulativeDistances[idx] <= distance <= cumulativeDistances[idx+1]; shared by
+     *  [pointAtDistance] and by seeding [RouteLocator]/[NavigationSession] at a persisted resume position. */
+    fun segmentIndexAtDistance(distance: Double): Int {
         val d = distance.coerceIn(0.0, totalDistance)
         var lo = 0
         var hi = cumulativeDistances.size - 1
@@ -67,7 +68,14 @@ class Route(val points: List<RoutePoint>) {
             val mid = (lo + hi + 1) / 2
             if (cumulativeDistances[mid] <= d) lo = mid else hi = mid - 1
         }
-        val idx = lo.coerceAtMost(points.size - 2)
+        return lo.coerceAtMost(points.size - 2)
+    }
+
+    /** Interpolated point at a given cumulative distance along the route; used to generate candidate
+     *  rejoin points when off-route without needing a raw point index. */
+    fun pointAtDistance(distance: Double): RoutePoint {
+        val d = distance.coerceIn(0.0, totalDistance)
+        val idx = segmentIndexAtDistance(d)
         val segStart = cumulativeDistances[idx]
         val segEnd = cumulativeDistances[idx + 1]
         val t = if (segEnd > segStart) ((d - segStart) / (segEnd - segStart)).coerceIn(0.0, 1.0) else 0.0
@@ -135,9 +143,9 @@ data class LocateResult(
 )
 
 /** Projects live GPS fixes onto the route, tracking progress with a forward-biased search window so it stays cheap on long routes. */
-class RouteLocator(private val route: Route) {
+class RouteLocator(private val route: Route, initialSegmentIndex: Int = 0) {
     private val proj = GeoMath.LocalProjection(route.points[route.points.size / 2].lat)
-    private var lastSegmentIndex = 0
+    private var lastSegmentIndex = initialSegmentIndex.coerceIn(0, route.points.size - 2)
 
     fun locate(lat: Double, lon: Double): LocateResult {
         val n = route.points.size
@@ -208,15 +216,27 @@ data class NavUpdate(
  *  deviation state (with hysteresis, so it doesn't flicker right at the threshold) plus the geometrically
  *  nearest point on the track, which candidate off-route routing (elsewhere) uses as a search anchor.
  *  Once that routing picks an actual rejoin point, [applyRerouteTarget] jumps the maneuver pointer straight
- *  there rather than waiting for GPS to physically arrive, so skipped checkpoints stop showing immediately. */
-class NavigationSession(val route: Route) {
-    private val locator = RouteLocator(route)
+ *  there rather than waiting for GPS to physically arrive, so skipped checkpoints stop showing immediately.
+ *
+ *  [initialDistanceAlongRoute] seeds both the locate search window and the maneuver pointer at a resumed
+ *  progress instead of the route start - used when the app restarts mid-ride and reloads persisted progress,
+ *  so the first fix doesn't need a full recovery scan and doesn't re-announce already-passed checkpoints. */
+class NavigationSession(val route: Route, initialDistanceAlongRoute: Double = 0.0) {
+    private val locator = RouteLocator(route, route.segmentIndexAtDistance(initialDistanceAlongRoute))
     private var maneuverPointer = 0
     private var offRoute = false
+
+    init {
+        skipManeuversBefore(initialDistanceAlongRoute.coerceIn(0.0, route.totalDistance))
+    }
 
     /** Skips forward past every checkpoint before [distanceAlongRoute]; the pointer only ever moves
      *  forward, so this is safe to call repeatedly as rerouting refines its choice of rejoin point. */
     fun applyRerouteTarget(distanceAlongRoute: Double) {
+        skipManeuversBefore(distanceAlongRoute)
+    }
+
+    private fun skipManeuversBefore(distanceAlongRoute: Double) {
         while (maneuverPointer < route.maneuvers.size &&
             route.maneuvers[maneuverPointer].distanceAlongRoute < distanceAlongRoute
         ) {
@@ -227,11 +247,7 @@ class NavigationSession(val route: Route) {
     fun update(lat: Double, lon: Double): NavUpdate {
         val loc = locator.locate(lat, lon)
         offRoute = if (offRoute) loc.offRouteMeters > OFF_ROUTE_EXIT_METERS else loc.offRouteMeters > OFF_ROUTE_ENTER_METERS
-        while (maneuverPointer < route.maneuvers.size &&
-            route.maneuvers[maneuverPointer].distanceAlongRoute < loc.distanceAlongRoute - HYSTERESIS_METERS
-        ) {
-            maneuverPointer++
-        }
+        skipManeuversBefore(loc.distanceAlongRoute - HYSTERESIS_METERS)
         val next = route.maneuvers.getOrNull(maneuverPointer)
         return if (next != null) {
             NavUpdate(
@@ -269,4 +285,26 @@ class NavigationSession(val route: Route) {
         private const val OFF_ROUTE_ENTER_METERS = 60.0
         private const val OFF_ROUTE_EXIT_METERS = 30.0
     }
+}
+
+/** Turn-by-turn instruction text for a maneuver; shared between the in-app banner and the foreground
+ *  navigation service's notification so the two never drift out of sync with each other. */
+fun instructionText(update: NavUpdate): String {
+    if (update.isFinalLeg) return "Continue to destination"
+    return when (update.maneuverType) {
+        ManeuverType.SLIGHT_LEFT -> "Slight left"
+        ManeuverType.LEFT -> "Turn left"
+        ManeuverType.SHARP_LEFT -> "Sharp left"
+        ManeuverType.SLIGHT_RIGHT -> "Slight right"
+        ManeuverType.RIGHT -> "Turn right"
+        ManeuverType.SHARP_RIGHT -> "Sharp right"
+        ManeuverType.U_TURN -> "Make a U-turn"
+        ManeuverType.STRAIGHT -> "Continue straight"
+    }
+}
+
+fun formatDistance(meters: Double): String = when {
+    meters >= 1000 -> "%.1f km".format(meters / 1000.0)
+    meters >= 100 -> "${(meters / 50.0).roundToInt() * 50} m"
+    else -> "${(meters / 10.0).roundToInt() * 10} m"
 }
