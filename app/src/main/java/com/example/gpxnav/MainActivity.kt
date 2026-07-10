@@ -86,8 +86,14 @@ class MainActivity : AppCompatActivity() {
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { granted ->
-        if (granted[Manifest.permission.ACCESS_FINE_LOCATION] == true) enableLocation()
-        else Toast.makeText(this, "Location permission needed", Toast.LENGTH_LONG).show()
+        if (granted[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
+            enableLocation()
+            // Only call site is the upload FAB; a first-time grant should open the picker right away
+            // rather than making the user tap Load GPX a second time.
+            openGpxLauncher.launch(arrayOf("*/*"))
+        } else {
+            Toast.makeText(this, "Location permission needed", Toast.LENGTH_LONG).show()
+        }
         // Notification permission denial is non-fatal: navigation still runs, just without a visible notification.
     }
 
@@ -113,7 +119,7 @@ class MainActivity : AppCompatActivity() {
         b.map.controller.setCenter(GeoPoint(51.16, 10.45)) // roughly the center of Germany
 
         b.btnLoadGpx.setOnClickListener {
-            if (hasAllPermissions()) openGpxLauncher.launch(arrayOf("*/*"))
+            if (hasLocationPermissions()) openGpxLauncher.launch(arrayOf("*/*"))
             else permLauncher.launch(requiredPermissions())
         }
 
@@ -202,9 +208,14 @@ class MainActivity : AppCompatActivity() {
         return perms.toTypedArray()
     }
 
-    private fun hasAllPermissions() = requiredPermissions().all {
-        ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-    }
+    /** Gates opening the GPX picker: location is what navigation actually needs. Deliberately excludes
+     *  POST_NOTIFICATIONS - that one's requested alongside it (see [requiredPermissions]) but its denial is
+     *  non-fatal (navigation still runs, just without a visible notification), and on API 33+ a permanently
+     *  denied notification permission would otherwise make [requiredPermissions] un-grantable forever,
+     *  silently stranding this gate with no dialog left to show. */
+    private fun hasLocationPermissions() = listOf(
+        Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION
+    ).all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
 
     private fun hasLocationPermission() = ContextCompat.checkSelfPermission(
         this, Manifest.permission.ACCESS_FINE_LOCATION
