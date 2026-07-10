@@ -6,6 +6,7 @@
     <color name="nav_text">#FFFFFF</color>
     <color name="nav_text_muted">#B0B4C8</color>
     <color name="route_traveled">#5A5F73</color>
+    <color name="reroute_path">#F2A93B</color>
     <color name="lane_active">#4F8EF7</color>
     <color name="lane_inactive">#4A4E5E</color>
 </resources>

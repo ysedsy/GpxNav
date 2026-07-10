@@ -57,6 +57,25 @@ class Route(val points: List<RoutePoint>) {
         return result
     }
 
+    /** Interpolated point at a given cumulative distance along the route; used to generate candidate
+     *  rejoin points when off-route without needing a raw point index. */
+    fun pointAtDistance(distance: Double): RoutePoint {
+        val d = distance.coerceIn(0.0, totalDistance)
+        var lo = 0
+        var hi = cumulativeDistances.size - 1
+        while (lo < hi) {
+            val mid = (lo + hi + 1) / 2
+            if (cumulativeDistances[mid] <= d) lo = mid else hi = mid - 1
+        }
+        val idx = lo.coerceAtMost(points.size - 2)
+        val segStart = cumulativeDistances[idx]
+        val segEnd = cumulativeDistances[idx + 1]
+        val t = if (segEnd > segStart) ((d - segStart) / (segEnd - segStart)).coerceIn(0.0, 1.0) else 0.0
+        val a = points[idx]
+        val b = points[idx + 1]
+        return RoutePoint(a.lat + t * (b.lat - a.lat), a.lon + t * (b.lon - a.lon))
+    }
+
     private fun classify(delta: Double): ManeuverType {
         val a = abs(delta)
         return when {
@@ -173,6 +192,7 @@ class RouteLocator(private val route: Route) {
 data class NavUpdate(
     val offRouteMeters: Double,
     val isOffRoute: Boolean,
+    val distanceAlongRoute: Double,
     val nearestLat: Double,
     val nearestLon: Double,
     val maneuverType: ManeuverType,
@@ -184,13 +204,25 @@ data class NavUpdate(
 )
 
 /** Ties a live GPS stream to a Route: which maneuver is next, and how far away it is.
- *  There's no road-network router here, so "rerouting" after a deviation means guiding the rider back to the
- *  nearest point on the recorded track rather than computing a new path; [NavUpdate.isOffRoute] carries that
- *  state (with hysteresis, so it doesn't flicker right at the threshold) plus the point to head back to. */
+ *  There's no road-network router here for the recorded track itself, so [NavUpdate.isOffRoute] just carries
+ *  deviation state (with hysteresis, so it doesn't flicker right at the threshold) plus the geometrically
+ *  nearest point on the track, which candidate off-route routing (elsewhere) uses as a search anchor.
+ *  Once that routing picks an actual rejoin point, [applyRerouteTarget] jumps the maneuver pointer straight
+ *  there rather than waiting for GPS to physically arrive, so skipped checkpoints stop showing immediately. */
 class NavigationSession(val route: Route) {
     private val locator = RouteLocator(route)
     private var maneuverPointer = 0
     private var offRoute = false
+
+    /** Skips forward past every checkpoint before [distanceAlongRoute]; the pointer only ever moves
+     *  forward, so this is safe to call repeatedly as rerouting refines its choice of rejoin point. */
+    fun applyRerouteTarget(distanceAlongRoute: Double) {
+        while (maneuverPointer < route.maneuvers.size &&
+            route.maneuvers[maneuverPointer].distanceAlongRoute < distanceAlongRoute
+        ) {
+            maneuverPointer++
+        }
+    }
 
     fun update(lat: Double, lon: Double): NavUpdate {
         val loc = locator.locate(lat, lon)
@@ -205,6 +237,7 @@ class NavigationSession(val route: Route) {
             NavUpdate(
                 offRouteMeters = loc.offRouteMeters,
                 isOffRoute = offRoute,
+                distanceAlongRoute = loc.distanceAlongRoute,
                 nearestLat = loc.nearestLat,
                 nearestLon = loc.nearestLon,
                 maneuverType = next.type,
@@ -218,6 +251,7 @@ class NavigationSession(val route: Route) {
             NavUpdate(
                 offRouteMeters = loc.offRouteMeters,
                 isOffRoute = offRoute,
+                distanceAlongRoute = loc.distanceAlongRoute,
                 nearestLat = loc.nearestLat,
                 nearestLon = loc.nearestLon,
                 maneuverType = ManeuverType.STRAIGHT,
