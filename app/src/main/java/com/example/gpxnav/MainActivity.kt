@@ -19,6 +19,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import android.widget.TextView
 import android.widget.Toast
@@ -431,8 +432,30 @@ class MainActivity : AppCompatActivity() {
         b.map.overlays.add(remaining)
         traveledPolyline = traveled
         remainingPolyline = remaining
-        b.map.zoomToBoundingBox(BoundingBox.fromGeoPoints(geoPoints), true, 100)
+        zoomToRoute(geoPoints)
         b.map.invalidate()
+    }
+
+    /** osmdroid's zoomToBoundingBox() runs a pixel-projection calculation that can spin the main thread
+     *  forever if called before the MapView has been laid out (width/height still 0) - a known osmdroid
+     *  gotcha. That race is real here: auto-resume can deliver the service's already-populated state
+     *  synchronously from LiveData.observe() inside onServiceConnected, which can land before the map's
+     *  first layout pass. Defer to a one-shot layout listener when the map isn't sized yet instead of
+     *  calling zoomToBoundingBox directly. */
+    private fun zoomToRoute(geoPoints: List<GeoPoint>) {
+        if (b.map.width > 0 && b.map.height > 0) {
+            b.map.zoomToBoundingBox(BoundingBox.fromGeoPoints(geoPoints), true, 100)
+            return
+        }
+        b.map.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                b.map.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                if (b.map.width > 0 && b.map.height > 0) {
+                    b.map.zoomToBoundingBox(BoundingBox.fromGeoPoints(geoPoints), true, 100)
+                    b.map.invalidate()
+                }
+            }
+        })
     }
 
     /** Splits the route polyline at the live GPS fix: the point nearest to us on the recorded track is
