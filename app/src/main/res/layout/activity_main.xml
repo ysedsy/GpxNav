@@ -15,43 +15,59 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
+        android:orientation="vertical"
         android:background="@drawable/banner_bg"
         android:visibility="gone">
 
-        <ImageView
-            android:id="@+id/ivArrow"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:src="@drawable/ic_arrow_straight"
-            android:contentDescription="@null" />
-
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="16dp"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-            <TextView
-                android:id="@+id/tvInstruction"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@color/nav_text"
-                android:textSize="34sp"
-                android:textStyle="bold"
-                android:maxLines="2"
-                android:text="Load a GPX route" />
+            <ImageView
+                android:id="@+id/ivArrow"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:src="@drawable/ic_arrow_straight"
+                android:contentDescription="@null" />
 
-            <TextView
-                android:id="@+id/tvDistance"
-                android:layout_width="match_parent"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:textColor="@color/nav_text_muted"
-                android:textSize="20sp"
-                android:layout_marginTop="2dp" />
+                android:layout_weight="1"
+                android:layout_marginStart="16dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvInstruction"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/nav_text"
+                    android:textSize="34sp"
+                    android:textStyle="bold"
+                    android:maxLines="2"
+                    android:text="Load a GPX route" />
+
+                <TextView
+                    android:id="@+id/tvDistance"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/nav_text_muted"
+                    android:textSize="20sp"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
         </LinearLayout>
+
+        <!-- Lane guidance: one glyph per OSM-tagged lane, highlighted when valid for the upcoming maneuver. Only shown when Overpass returned turn:lanes data for this maneuver. -->
+        <LinearLayout
+            android:id="@+id/laneRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="10dp"
+            android:visibility="gone" />
     </LinearLayout>
 
     <LinearLayout

@@ -12,6 +12,8 @@ No API key, no Play Services, no server: map tiles come from [osmdroid](https://
 4. The route is drawn on the map and zoomed to fit. As you ride, the banner at the top shows the next turn and a live, rotating arrow + distance countdown.
 5. Tap the location FAB to toggle map auto-follow.
 
+While following, the map rotates heading-up (like Google Maps turn-by-turn), eases the zoom in as you approach a maneuver, and the route line is split into a traveled/remaining pair anchored to your live GPS fix rather than the static recorded track. When OpenStreetMap has `turn:lanes` tagging for an upcoming junction, a lane row appears in the banner highlighting which lane(s) to use — this is the one feature that needs a network call (a one-shot Overpass API lookup per loaded route); everything else stays fully offline, and most rural/curvy roads simply have no lane tagging, in which case the row just doesn't appear.
+
 ## How turn detection works
 
 1. **Parse** — reads `trkpt` (track log, preferred), falling back to `rtept`, then `wpt`.

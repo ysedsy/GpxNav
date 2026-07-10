@@ -107,7 +107,13 @@ class Route(val points: List<RoutePoint>) {
     }
 }
 
-data class LocateResult(val distanceAlongRoute: Double, val offRouteMeters: Double, val segmentIndex: Int)
+data class LocateResult(
+    val distanceAlongRoute: Double,
+    val offRouteMeters: Double,
+    val segmentIndex: Int,
+    val nearestLat: Double,
+    val nearestLon: Double
+)
 
 /** Projects live GPS fixes onto the route, tracking progress with a forward-biased search window so it stays cheap on long routes. */
 class RouteLocator(private val route: Route) {
@@ -150,7 +156,11 @@ class RouteLocator(private val route: Route) {
         lastSegmentIndex = bestIdx
         val distAlong = route.cumulativeDistances[bestIdx] +
             bestT * (route.cumulativeDistances[bestIdx + 1] - route.cumulativeDistances[bestIdx])
-        return LocateResult(distAlong, bestDist, bestIdx)
+        val a = route.points[bestIdx]
+        val b = route.points[bestIdx + 1]
+        val nearestLat = a.lat + bestT * (b.lat - a.lat)
+        val nearestLon = a.lon + bestT * (b.lon - a.lon)
+        return LocateResult(distAlong, bestDist, bestIdx, nearestLat, nearestLon)
     }
 
     companion object {
@@ -162,19 +172,29 @@ class RouteLocator(private val route: Route) {
 
 data class NavUpdate(
     val offRouteMeters: Double,
+    val isOffRoute: Boolean,
+    val nearestLat: Double,
+    val nearestLon: Double,
     val maneuverType: ManeuverType,
     val turnAngleDegrees: Double,
     val distanceToEvent: Double,
-    val isFinalLeg: Boolean
+    val isFinalLeg: Boolean,
+    val segmentIndex: Int,
+    val maneuverIndex: Int
 )
 
-/** Ties a live GPS stream to a Route: which maneuver is next, and how far away it is. */
+/** Ties a live GPS stream to a Route: which maneuver is next, and how far away it is.
+ *  There's no road-network router here, so "rerouting" after a deviation means guiding the rider back to the
+ *  nearest point on the recorded track rather than computing a new path; [NavUpdate.isOffRoute] carries that
+ *  state (with hysteresis, so it doesn't flicker right at the threshold) plus the point to head back to. */
 class NavigationSession(val route: Route) {
     private val locator = RouteLocator(route)
     private var maneuverPointer = 0
+    private var offRoute = false
 
     fun update(lat: Double, lon: Double): NavUpdate {
         val loc = locator.locate(lat, lon)
+        offRoute = if (offRoute) loc.offRouteMeters > OFF_ROUTE_EXIT_METERS else loc.offRouteMeters > OFF_ROUTE_ENTER_METERS
         while (maneuverPointer < route.maneuvers.size &&
             route.maneuvers[maneuverPointer].distanceAlongRoute < loc.distanceAlongRoute - HYSTERESIS_METERS
         ) {
@@ -184,23 +204,35 @@ class NavigationSession(val route: Route) {
         return if (next != null) {
             NavUpdate(
                 offRouteMeters = loc.offRouteMeters,
+                isOffRoute = offRoute,
+                nearestLat = loc.nearestLat,
+                nearestLon = loc.nearestLon,
                 maneuverType = next.type,
                 turnAngleDegrees = next.turnAngleDegrees,
                 distanceToEvent = (next.distanceAlongRoute - loc.distanceAlongRoute).coerceAtLeast(0.0),
-                isFinalLeg = false
+                isFinalLeg = false,
+                segmentIndex = loc.segmentIndex,
+                maneuverIndex = maneuverPointer
             )
         } else {
             NavUpdate(
                 offRouteMeters = loc.offRouteMeters,
+                isOffRoute = offRoute,
+                nearestLat = loc.nearestLat,
+                nearestLon = loc.nearestLon,
                 maneuverType = ManeuverType.STRAIGHT,
                 turnAngleDegrees = 0.0,
                 distanceToEvent = (route.totalDistance - loc.distanceAlongRoute).coerceAtLeast(0.0),
-                isFinalLeg = true
+                isFinalLeg = true,
+                segmentIndex = loc.segmentIndex,
+                maneuverIndex = maneuverPointer
             )
         }
     }
 
     companion object {
         private const val HYSTERESIS_METERS = 8.0
+        private const val OFF_ROUTE_ENTER_METERS = 60.0
+        private const val OFF_ROUTE_EXIT_METERS = 30.0
     }
 }
